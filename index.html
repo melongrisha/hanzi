@@ -16,13 +16,28 @@ background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradien
 #card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:10px}
 #card .big{font-size:72px;line-height:1.1}#card .py{font-size:22px;color:var(--acc);margin:4px 0}
 #card ol{margin:4px 0 12px;padding-left:22px}.hint{color:#888;font-size:14px}
+#q{width:100%;padding:12px;font-size:16px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg);margin-bottom:8px}
+#res button{display:block;width:100%;text-align:left;margin:0 0 6px;padding:10px}#res b{font-size:22px;margin-right:8px}#res span{color:var(--acc);margin-right:8px}
 </style></head><body>
 <h1>Рукописный ввод иероглифов</h1>
+<input id="q" placeholder="Поиск: иероглиф, pinyin (ü = v) или по-русски"><div id="res"></div>
 <canvas id="pad"></canvas>
 <div class="row"><button id="undo">↶ Отменить черту</button><button id="clr">Очистить</button></div>
 <div id="cands"><span class="hint" id="st">Загрузка распознавателя…</span></div>
 <div id="card" hidden></div>
-<script src="hanzilookup.min.js"></script>
+<script src="hanzilookup.min.js">const norm=t=>t.replace(/[üǖǘǚǜ]/g,'v').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[\s'’]/g,'');
+$('q').oninput=e=>{
+ const q=e.target.value.trim(),box=$('res');box.innerHTML='';if(!q)return;
+ const han=/[\u4e00-\u9fff]/.test(q),cyr=/[а-яё]/i.test(q),n=norm(q),ql=q.toLowerCase(),out=[];
+ for(const k in dict){const d=dict[k];
+  const ok=han?k.includes(q):cyr?d.some(r=>r.ru.some(t=>t.toLowerCase().includes(ql))):d.some(r=>norm(r.py).startsWith(n));
+  if(ok&&out.push(k)>=30)break}
+ if(!out.length){box.innerHTML='<p class="hint">Ничего не найдено в словаре.</p>';return}
+ out.forEach(k=>{const b=document.createElement('button');
+  b.innerHTML=`<b>${k}</b><span>${dict[k][0].py}</span>${dict[k][0].ru.slice(0,3).join(', ')}`;
+  b.onclick=()=>{show(k);$('card').scrollIntoView({behavior:'smooth'})};box.appendChild(b)});
+};
+</script>
 <script>
 const $=id=>document.getElementById(id);
 let strokes=[],cur=null,dict={},ready=false;
@@ -39,13 +54,15 @@ cv.onpointerup=cv.onpointercancel=()=>{if(cur){cur=null;recognize()}};
 $('undo').onclick=()=>{strokes.pop();redraw();recognize()};
 $('clr').onclick=()=>{strokes=[];redraw();$('cands').innerHTML='';$('card').hidden=true};
 addEventListener('resize',size);size();
-fetch('dict.json').then(r=>r.json()).then(d=>dict=d).catch(()=>{});
+['dict.json','dict2.json'].forEach(f=>fetch(f).then(r=>r.json()).then(d=>Object.assign(dict,d)).catch(()=>{}));
 HanziLookup.init('mmah','mmah.json',ok=>{ready=ok;$('st').textContent=ok?'Нарисуйте иероглиф':'Не найден файл mmah.json'});
 function recognize(){
  if(!ready||!strokes.length){$('cands').innerHTML='';return}
  const a=new HanziLookup.AnalyzedCharacter(strokes);
  new HanziLookup.Matcher('mmah').match(a,10,m=>{
   const box=$('cands');box.innerHTML='';
+  if(strokes.length==1){const t=strokes[0],a=t[0],e=t[t.length-1],dx=Math.abs(e[0]-a[0]),dy=Math.abs(e[1]-a[1]);
+   if(dx>cv.clientWidth*.25&&dy<dx*.3&&!m.some(x=>x.character=='一'))m.unshift({character:'一'})}
   m.forEach((x,i)=>{const b=document.createElement('button');b.textContent=x.character;
    b.onclick=()=>{[...box.children].forEach(c=>c.classList.remove('on'));b.classList.add('on');show(x.character)};box.appendChild(b)});
   if(m.length)box.children[0].click();
@@ -53,7 +70,7 @@ function recognize(){
 }
 function show(ch){
  const c=$('card'),d=dict[ch];c.hidden=false;
- let h=`<div class="big">${ch}</div>`;
+ let h=`<div class="big" style="font-size:${ch.length>2?44:72}px">${ch}</div>`;
  if(!d)h+='<p class="hint">Перевода пока нет в словаре — он появится на следующих этапах.</p>';
  else d.forEach(r=>{h+=`<div class="py">${r.py}</div><ol>${r.ru.map(t=>`<li>${t}</li>`).join('')}</ol>`});
  c.innerHTML=h;
