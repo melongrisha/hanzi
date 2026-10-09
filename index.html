@@ -25,25 +25,13 @@ background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradien
 <div class="row"><button id="undo">↶ Отменить черту</button><button id="clr">Очистить</button></div>
 <div id="cands"><span class="hint" id="st">Загрузка распознавателя…</span></div>
 <div id="card" hidden></div>
-<script src="hanzilookup.min.js">const norm=t=>t.replace(/[üǖǘǚǜ]/g,'v').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[\s'’]/g,'');
-$('q').oninput=e=>{
- const q=e.target.value.trim(),box=$('res');box.innerHTML='';if(!q)return;
- const han=/[\u4e00-\u9fff]/.test(q),cyr=/[а-яё]/i.test(q),n=norm(q),ql=q.toLowerCase(),out=[];
- for(const k in dict){const d=dict[k];
-  const ok=han?k.includes(q):cyr?d.some(r=>r.ru.some(t=>t.toLowerCase().includes(ql))):d.some(r=>norm(r.py).startsWith(n));
-  if(ok&&out.push(k)>=30)break}
- if(!out.length){box.innerHTML='<p class="hint">Ничего не найдено в словаре.</p>';return}
- out.forEach(k=>{const b=document.createElement('button');
-  b.innerHTML=`<b>${k}</b><span>${dict[k][0].py}</span>${dict[k][0].ru.slice(0,3).join(', ')}`;
-  b.onclick=()=>{show(k);$('card').scrollIntoView({behavior:'smooth'})};box.appendChild(b)});
-};
-</script>
+<script src="hanzilookup.min.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 let strokes=[],cur=null,dict={},ready=false;
 const cv=$('pad'),ctx=cv.getContext('2d');
 function size(){const r=devicePixelRatio||1,s=cv.clientWidth;cv.width=cv.height=s*r;ctx.setTransform(r,0,0,r,0,0);redraw()}
-function redraw(){const s=cv.clientWidth;ctx.clearRect(0,0,s,s);ctx.lineWidth=s/22;ctx.lineCap=ctx.lineJoin='round';
+function redraw(){const s=cv.clientWidth;ctx.clearRect(0,0,s,s);ctx.lineWidth=Math.max(3,s/60);ctx.lineCap=ctx.lineJoin='round';
 ctx.strokeStyle=getComputedStyle(document.body).color;
 for(const st of strokes){ctx.beginPath();st.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));
 if(st.length==1)ctx.lineTo(st[0][0]+.1,st[0][1]);ctx.stroke()}}
@@ -54,7 +42,7 @@ cv.onpointerup=cv.onpointercancel=()=>{if(cur){cur=null;recognize()}};
 $('undo').onclick=()=>{strokes.pop();redraw();recognize()};
 $('clr').onclick=()=>{strokes=[];redraw();$('cands').innerHTML='';$('card').hidden=true};
 addEventListener('resize',size);size();
-['dict.json','dict2.json'].forEach(f=>fetch(f).then(r=>r.json()).then(d=>Object.assign(dict,d)).catch(()=>{}));
+['dict.json','dict2.json','dict3.json'].forEach(f=>fetch(f).then(r=>r.json()).then(d=>Object.assign(dict,d)).catch(()=>{}));
 HanziLookup.init('mmah','mmah.json',ok=>{ready=ok;$('st').textContent=ok?'Нарисуйте иероглиф':'Не найден файл mmah.json'});
 function recognize(){
  if(!ready||!strokes.length){$('cands').innerHTML='';return}
@@ -75,4 +63,16 @@ function show(ch){
  else d.forEach(r=>{h+=`<div class="py">${r.py}</div><ol>${r.ru.map(t=>`<li>${t}</li>`).join('')}</ol>`});
  c.innerHTML=h;
 }
+const norm=t=>t.replace(/[üǖǘǚǜ]/g,'v').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[\s'’]/g,'');
+$('q').oninput=e=>{
+ const q=e.target.value.trim(),box=$('res');box.innerHTML='';if(!q)return;
+ const han=/[\u4e00-\u9fff]/.test(q),cyr=/[а-яё]/i.test(q),n=norm(q),ql=q.toLowerCase(),out=[];
+ for(const k in dict){const d=dict[k];
+  const ok=han?k.includes(q):cyr?d.some(r=>r.ru.some(t=>t.toLowerCase().includes(ql))):d.some(r=>norm(r.py).startsWith(n));
+  if(ok&&out.push(k)>=30)break}
+ if(!out.length){box.innerHTML='<p class="hint">Ничего не найдено в словаре.</p>';return}
+ out.forEach(k=>{const b=document.createElement('button');
+  b.innerHTML=`<b>${k}</b><span>${dict[k][0].py}</span>${dict[k][0].ru.slice(0,3).join(', ')}`;
+  b.onclick=()=>{show(k);$('card').scrollIntoView({behavior:'smooth'})};box.appendChild(b)});
+};
 </script></body></html>
