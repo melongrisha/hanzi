@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Иероглифы</title>
+<style>
+:root{--bg:#faf8f4;--fg:#222;--card:#fff;--line:#d8d2c6;--acc:#b3261e}
+@media(prefers-color-scheme:dark){:root{--bg:#171614;--fg:#eee;--card:#23211e;--line:#444;--acc:#ff8a80}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px system-ui,sans-serif;padding:12px;max-width:640px;margin:auto}
+h1{font-size:20px;margin:4px 0 10px}
+#pad{width:100%;aspect-ratio:1;background:var(--card);border:2px solid var(--line);border-radius:12px;touch-action:none;display:block;
+background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:50% 50%}
+.row{display:flex;gap:8px;margin:8px 0}button{flex:1;padding:12px;font-size:16px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg)}
+#cands{display:flex;flex-wrap:wrap;gap:8px;min-height:56px}
+#cands button{flex:0 0 auto;width:56px;height:56px;font-size:30px;padding:0}
+#cands button.on{border-color:var(--acc);border-width:2px}
+#card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:10px}
+#card .big{font-size:72px;line-height:1.1}#card .py{font-size:22px;color:var(--acc);margin:4px 0}
+#card ol{margin:4px 0 12px;padding-left:22px}.hint{color:#888;font-size:14px}
+</style></head><body>
+<h1>Рукописный ввод иероглифов</h1>
+<canvas id="pad"></canvas>
+<div class="row"><button id="undo">↶ Отменить черту</button><button id="clr">Очистить</button></div>
+<div id="cands"><span class="hint" id="st">Загрузка распознавателя…</span></div>
+<div id="card" hidden></div>
+<script src="hanzilookup.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+let strokes=[],cur=null,dict={},ready=false;
+const cv=$('pad'),ctx=cv.getContext('2d');
+function size(){const r=devicePixelRatio||1,s=cv.clientWidth;cv.width=cv.height=s*r;ctx.setTransform(r,0,0,r,0,0);redraw()}
+function redraw(){const s=cv.clientWidth;ctx.clearRect(0,0,s,s);ctx.lineWidth=s/22;ctx.lineCap=ctx.lineJoin='round';
+ctx.strokeStyle=getComputedStyle(document.body).color;
+for(const st of strokes){ctx.beginPath();st.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));
+if(st.length==1)ctx.lineTo(st[0][0]+.1,st[0][1]);ctx.stroke()}}
+const pt=e=>{const b=cv.getBoundingClientRect();return[e.clientX-b.left,e.clientY-b.top]};
+cv.onpointerdown=e=>{cv.setPointerCapture(e.pointerId);cur=[pt(e)];strokes.push(cur);redraw()};
+cv.onpointermove=e=>{if(cur){cur.push(pt(e));redraw()}};
+cv.onpointerup=cv.onpointercancel=()=>{if(cur){cur=null;recognize()}};
+$('undo').onclick=()=>{strokes.pop();redraw();recognize()};
+$('clr').onclick=()=>{strokes=[];redraw();$('cands').innerHTML='';$('card').hidden=true};
+addEventListener('resize',size);size();
+fetch('dict.json').then(r=>r.json()).then(d=>dict=d).catch(()=>{});
+HanziLookup.init('mmah','mmah.json',ok=>{ready=ok;$('st').textContent=ok?'Нарисуйте иероглиф':'Не найден файл mmah.json'});
+function recognize(){
+ if(!ready||!strokes.length){$('cands').innerHTML='';return}
+ const a=new HanziLookup.AnalyzedCharacter(strokes);
+ new HanziLookup.Matcher('mmah').match(a,10,m=>{
+  const box=$('cands');box.innerHTML='';
+  m.forEach((x,i)=>{const b=document.createElement('button');b.textContent=x.character;
+   b.onclick=()=>{[...box.children].forEach(c=>c.classList.remove('on'));b.classList.add('on');show(x.character)};box.appendChild(b)});
+  if(m.length)box.children[0].click();
+ });
+}
+function show(ch){
+ const c=$('card'),d=dict[ch];c.hidden=false;
+ let h=`<div class="big">${ch}</div>`;
+ if(!d)h+='<p class="hint">Перевода пока нет в словаре — он появится на следующих этапах.</p>';
+ else d.forEach(r=>{h+=`<div class="py">${r.py}</div><ol>${r.ru.map(t=>`<li>${t}</li>`).join('')}</ol>`});
+ c.innerHTML=h;
+}
+</script></body></html>
